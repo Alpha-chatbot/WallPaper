@@ -1,0 +1,105 @@
+第一阶段：可以利用动态壁纸1.0窗口播放视频；
+第二阶段：点击按钮可以做到代替原电脑壁纸进行屏幕播放（窗口->桌面）
+补充：添加logo和界面优化
+开发工具：VS2019 使用c#
+
+准备工作：下载Nuget，这算是VS的扩展，作用就是更方便的引用类库
+比如MahApps.Metro，Metro风格的界面
+https://www.cnblogs.com/NailClipper/archive/2012/10/04/2711799.html
+①第一步：先设计界面
+
+利用WPF 的MediaElement 控件支持视频播放；
+其中window属性resizemode设置：
+      *NoResize：不可调节，同时没有最大最小按钮；
+      *CanMinimize：不可调节。但可以最小化；（此时最大化按钮不可用）
+      *CanResize：可调节【默认】；
+      *CanResizeWithGrip：可根据网格调节；（窗口右下脚显示可调节网格）
+
+
+②为界面的相应控件添加函数
+打开按钮主要涉及OpenFileDialog函数，用来打开本地文件夹
+相关函数如下：
+     OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "Video File(*.avi;*.mp4;*.mkv;*.wav;*.rmvb)|*.avi;*.mp4;*.mkv;*.wav;*.rmvb|All File(*.*)|*.*";
+            openFileDialog.Multiselect = false;
+            DialogResult dialogResult = openFileDialog.ShowDialog();
+            if (dialogResult == System.Windows.Forms.DialogResult.OK)//点击确定后继续执行
+            {
+                currentPlayPath = openFileDialog.FileName;
+                media.Stop();
+                media.Source = new Uri(currentPlayPath);
+                media.Play();
+                isPlay = true;
+            }
+
+项目添加引用System.Windows.Forms
+
+Resize属性
+	NoResize	无法调整窗口的大小。标题栏中不显示“最小化”和“最大化”按钮。
+ 	CanMinimize只能最小化和还原窗口。同时显示“最小化”和“最大化”按钮，
+	但只有“最小化”按钮处于启用状态。
+ 	CanResize	可以调整窗口的大小。同时显示“最小化”和“最大化”按钮，并且两个按钮均处于启用状态。
+ 	CanResizeWithGrip	可以调整窗口的大小。同时显示“最小化”和“最大化”按钮，并且两个按钮均处于启用状态。
+	窗口的右下角显示一个大小调整手柄。
+
+在WPF 中可以使用MediaElement 为应用程序添加媒体播放控件，
+实现播放视频功能
+
+为视频添加播放，暂停，快进，快退
+利用mediaelement自带的方法可以实现播放，暂停
+Stop(),  Play()
+注意，MediaElement 的LoadedBehavior 需要设置为Manual，这样才可以手动控制视频的播放状态
+
+③实现窗口内容代替桌面原壁纸
+首先是壁纸效果而不是一个播放器，所以不能直接用WPF全屏显示，会遮盖桌面文件
+而且需要置于桌面最底层，无视win+d这种快捷键
+
+需要使用Windows API
+学习参考
+https://www.cnblogs.com/moonlight-zjb/p/3442298.html
+1，引入Windows API 
+using System.Runtime.InteropServices;
+....
+[DllImport("user32.dll")]
+public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X,int Y, int cx, int cy, uint uFlags);
+
+public const UInt32 SWP_NOSIZE = 0x0001;
+public const UInt32 SWP_NOMOVE = 0x0002;
+public const UInt32 SWP_NOACTIVATE = 0x0010;
+public static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+
+2,使用API
+见下
+
+3.如何将没必要的窗体隐藏
+Title="MainWindow" Height="350" Width="525" ShowInTaskbar="False" 
+WindowState="Minimized" Visibility="Hidden"
+
+4.将WPF窗体置底
+学习参考：https://www.bilibili.com/read/cv1867677/
+可以使用SetParent函数来设置弹出式窗口，层叠窗口或子窗口的父窗口
+
+5.防止切换程序后未置于最底层
+需要使用函数保存window窗体的状态，以及获取准确合适的窗体大小
+见WindowControl
+https://blog.csdn.net/hellokandy/article/details/53408799?depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-1&utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-1
+//相关函数： Window_Loaded（）
+//需要引用两个dll：
+//System.Windows.Forms; System.Drawing
+获取屏幕大小
+int workWidth = Screen.PrimaryScreen.WorkingArea.Width;
+int workHeight = Screen.PrimaryScreen.WorkingArea.Height;
+或者？
+System.Windows.SystemParameters.PrimaryScreenWidth;
+System.Windows.SystemParameters.PrimaryScreenHeight;
+见Full.xaml.cs
+全屏：参考如下
+https://blog.csdn.net/qq_27508477/article/details/87873474
+首先在xaml文件中的Window标签中，添加Loaded属性
+Loaded="Window_Loaded"，即窗口加载时执行Window_Loaded函数。
+
+④解决关闭窗口但仍有线程仍在运行导致程序无法结束
+
+在window关闭事件中加入下列语句即可
+System.Environment.Exit(0);
+
